@@ -16,7 +16,7 @@ namespace MvcDIMemoryLeak
         {
             var services = new ServiceCollection();
             ConfigureServices(services);
-            var resolver = new DefaultDependencyResolver(services.BuildServiceProvider());
+            var resolver = new DefaultDependencyResolver(services);
             DependencyResolver.SetResolver(resolver);
         }
 

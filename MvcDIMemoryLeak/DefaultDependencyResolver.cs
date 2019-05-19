@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Web.Mvc;
+using System.Web.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MvcDIMemoryLeak
@@ -9,9 +10,11 @@ namespace MvcDIMemoryLeak
     {
         protected IServiceProvider ServiceProvider;
 
-        public DefaultDependencyResolver(IServiceProvider serviceProvider)
+        public DefaultDependencyResolver(IServiceCollection serviceProvider)
         {
-            ServiceProvider = serviceProvider;
+            serviceProvider.AddSingleton<IControllerFactory, ScopedControllerFactory>(_ => new ScopedControllerFactory(this));
+
+            ServiceProvider = serviceProvider.BuildServiceProvider();
         }
 
         public object GetService(Type serviceType)
@@ -23,6 +26,35 @@ namespace MvcDIMemoryLeak
         public IEnumerable<object> GetServices(Type serviceType)
         {
             return ServiceProvider.GetServices(serviceType);
+        }
+
+        class ScopedControllerFactory : DefaultControllerFactory
+        {
+            private DefaultDependencyResolver parentResolver;
+
+            public ScopedControllerFactory(DefaultDependencyResolver defaultDependencyResolver)
+            {
+                this.parentResolver = defaultDependencyResolver;
+            }
+
+            protected override IController GetControllerInstance(RequestContext requestContext, Type controllerType)
+            {
+                var scope = this.parentResolver.ServiceProvider.CreateScope();
+                requestContext.HttpContext.Items["DiScope"] = scope;
+                return (IController)scope.ServiceProvider.GetService(controllerType);
+            }
+
+            public override void ReleaseController(IController controller)
+            {
+                var mvcController = controller as Controller;
+                if (mvcController != null)
+                {
+                    var scope = (IServiceScope)mvcController.HttpContext.Items["DiScope"];
+                    scope.Dispose();
+                }
+
+                base.ReleaseController(controller);
+            }
         }
     }
 }
