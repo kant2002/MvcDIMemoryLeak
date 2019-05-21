@@ -39,6 +39,11 @@ namespace MvcDIMemoryLeak
 
             protected override IController GetControllerInstance(RequestContext requestContext, Type controllerType)
             {
+                if (controllerType == null)
+                {
+                    return base.GetControllerInstance(requestContext, controllerType);
+                }
+
                 var scope = this.parentResolver.ServiceProvider.CreateScope();
                 requestContext.HttpContext.Items["DiScope"] = scope;
                 return (IController)scope.ServiceProvider.GetService(controllerType);
